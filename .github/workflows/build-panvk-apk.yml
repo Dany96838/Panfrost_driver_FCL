@@ -7,6 +7,7 @@ on:
     # Uploading the verified native library starts the build automatically.
     paths:
       - 'PanVK_FCL_Plugin_Experimental/app/src/main/jniLibs/arm64-v8a/libvulkan_panfrost.zip'
+      - '.github/workflows/build-panvk-apk.yml'
 
 permissions:
   contents: read
