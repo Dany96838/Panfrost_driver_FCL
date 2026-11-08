@@ -26,7 +26,9 @@ O workflow `.github/workflows/build-panvk-apk.yml` foi ajustado para:
 - compilar a variante Release sem assinatura embutida;
 - gerar uma chave RSA aleatória e temporária por execução;
 - assinar e verificar o APK com essa chave;
-- publicar o APK como artefato por 14 dias.
+- publicar cada APK como artefato por 14 dias.
+
+O workflow usa uma matriz de 8 tentativas paralelas, conforme solicitado. Cada tentativa gera sua própria chave aleatória temporária e um APK independente.
 
 O build automático é disparado quando o arquivo binário exato é adicionado ou atualizado no caminho esperado. Alterações somente em documentação ou workflow não disparam builds inúteis.
 
