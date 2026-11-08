@@ -49,7 +49,7 @@ jobs:
 
       - name: Build Android plugin APK
         working-directory: PanVK_FCL_Plugin_Experimental
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:assembleRelease
 
       - name: Generate one-time random signing key
         run: |
@@ -65,7 +65,7 @@ jobs:
       - name: Sign APK with temporary key and verify
         run: |
           set -euo pipefail
-          APK="PanVK_FCL_Plugin_Experimental/app/build/outputs/apk/debug/app-debug.apk"
+          APK="PanVK_FCL_Plugin_Experimental/app/build/outputs/apk/release/app-release-unsigned.apk"
           OUT="$RUNNER_TEMP/PanVK-FCL-1.3.4.5-experimental.apk"
           test -s "$APK"
           APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
