@@ -85,3 +85,5 @@ jobs:
           name: ARK-Legacy-debuggable
           path: ARK_Legacy_debuggable.apk
           if-no-files-found: error
+
+# Trigger validation after workflow registration
