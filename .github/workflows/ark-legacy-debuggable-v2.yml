@@ -1,0 +1,93 @@
+name: Build ARK Legacy debuggable APK v2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ark-legacy-debuggable-v2.yml'
+      - 'ARK/ark.part00'
+      - 'ARK/ark.part01'
+      - 'ARK/ark.part02'
+      - 'ARK/trigger-build.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reassemble original APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat ARK/ark.part00 ARK/ark.part01 ARK/ark.part02 > ark-original.apk
+          test -s ark-original.apk
+          unzip -t ark-original.apk
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Android SDK and install Build Tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          echo "/usr/local/lib/android/sdk/platform-tools" >> "$GITHUB_PATH"
+          SDKMANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          "$SDKMANAGER" --install "build-tools;35.0.0"
+
+      - name: Install Apktool
+        shell: bash
+        run: |
+          curl -fL https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar -o "$RUNNER_TEMP/apktool.jar"
+          printf '#!/bin/sh\nexec java -jar "%s" "$@"\n' "$RUNNER_TEMP/apktool.jar" > "$RUNNER_TEMP/apktool"
+          chmod +x "$RUNNER_TEMP/apktool"
+          sudo mv "$RUNNER_TEMP/apktool" /usr/local/bin/apktool
+
+      - name: Enable debuggable in manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          apktool d -f ark-original.apk -o decoded
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          path = "decoded/AndroidManifest.xml"
+          tree = ET.parse(path)
+          root = tree.getroot()
+          ns = "{http://schemas.android.com/apk/res/android}"
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("Missing application element")
+          app.set(ns + "debuggable", "true")
+          tree.write(path, encoding="utf-8", xml_declaration=True)
+          PY
+          apktool b decoded -o ark-unsigned.apk
+
+      - name: Align APK
+        run: "$ANDROID_HOME/build-tools/35.0.0/zipalign -p -f 4 ark-unsigned.apk ark-aligned.apk"
+
+      - name: Sign APK v2 and v3
+        shell: bash
+        run: |
+          keytool -genkeypair -keystore ark-debug.keystore -storepass changeit -keypass changeit -alias arkdebug -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=ARK Debug Build, OU=Local, O=Local, L=NA, S=NA, C=US"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks ark-debug.keystore --ks-key-alias arkdebug --ks-pass pass:changeit --key-pass pass:changeit --v2-signing-enabled true --v3-signing-enabled true --out ARK_Legacy_debuggable.apk ark-aligned.apk
+
+      - name: Verify output
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose ARK_Legacy_debuggable.apk
+          apktool d -f ARK_Legacy_debuggable.apk -o verify-decoded
+          grep -q 'android:debuggable="true"' verify-decoded/AndroidManifest.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ARK-Legacy-debuggable
+          path: ARK_Legacy_debuggable.apk
+          if-no-files-found: error
